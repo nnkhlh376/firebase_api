@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Tìm POIs Việt Nam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <!-- Leaflet Routing Machine CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Auth Button -->
+  <button id="authBtn" class="auth-btn" aria-label="Đăng nhập">
+    <span id="authIcon">👤</span>
+    <span id="authText">Đăng nhập</span>
+  </button>
+
+  <div id="controls">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <input type="text" id="placeInput" placeholder="Nhập tên địa điểm tại Việt Nam…" size="40" autocomplete="off">
+      <button id="searchBtn">Tìm</button>
+    </div>
+  </div>
+
+  <!-- Weather info panel (populated by app.js) -->
+  <div id="weatherInfo" class="weather-info" aria-live="polite"></div>
+  <div id="map"></div>
+
+  <!-- Quick Translate floating button -->
+  <button id="quickTranslateBtn" class="qt-fab" aria-label="Dịch nhanh">🌐 Dịch nhanh</button>
+
+  <!-- Auth Modal Overlay + Popup -->
+  <div id="authOverlay" class="qt-overlay is-hidden"></div>
+  <div id="authPopup" class="auth-popup is-hidden" aria-modal="true" role="dialog">
+    <div class="qt-header">
+      <div class="qt-title">🔐 Xác thực người dùng</div>
+      <button class="qt-close" id="authCloseBtn" aria-label="Đóng">✕</button>
+    </div>
+
+    <!-- Auth Tabs -->
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">Đăng nhập</button>
+      <button class="auth-tab" data-tab="register">Đăng ký</button>
+    </div>
+
+    <!-- Message Area -->
+    <div id="authMessage" class="auth-message is-hidden"></div>
+
+    <!-- Login Form -->
+    <div id="loginTab" class="auth-tab-content">
+      <div class="qt-row">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="example@email.com" required autocomplete="off">
+      </div>
+      <div class="qt-row">
+        <label>Mật khẩu</label>
+        <input type="password" id="loginPassword" placeholder="Nhập mật khẩu" required autocomplete="new-password">
+      </div>
+      <button class="qt-btn" id="loginBtn">Đăng nhập</button>
+      
+      <!-- Nút đăng nhập Google -->
+      <div class="google-box">
+        <button id="googleLoginBtn" class="qt-btn google-btn">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
+                 width="18" style="margin-right:8px;">
+            Đăng nhập bằng Google
+        </button>
+      </div>
+    </div>
+
+    <!-- Register Form -->
+    <div id="registerTab" class="auth-tab-content is-hidden">
+      <div class="qt-row">
+        <label>Email</label>
+        <input type="email" id="registerEmail" placeholder="example@email.com" required autocomplete="off">
+      </div>
+      <div class="qt-row">
+        <label>Mật khẩu</label>
+        <input type="password" id="registerPassword" placeholder="Tối thiểu 6 ký tự" required minlength="6" autocomplete="new-password">
+      </div>
+      <div class="qt-row">
+        <label>Xác nhận mật khẩu</label>
+        <input type="password" id="registerPasswordConfirm" placeholder="Nhập lại mật khẩu" required autocomplete="new-password">
+      </div>
+      <button class="qt-btn" id="registerBtn">Đăng ký</button>
+    </div>
+
+    <!-- User Info (shown after login) -->
+    <div id="userInfoTab" class="auth-tab-content is-hidden">
+      <!-- User Info Display -->
+      <div id="userInfoDisplay">
+        <div class="user-info-box">
+          <div class="user-avatar">👤</div>
+
+          <div class="user-info-row">
+            <strong>Email:</strong>
+            <span id="userEmail">—</span>
+          </div>
+
+          <div class="user-info-row">
+            <strong>User ID:</strong>
+            <span id="userId">—</span>
+          </div>
+
+          <div class="user-info-row">
+            <strong>Xác thực email:</strong>
+            <span id="userVerified">—</span>
+          </div>
+
+          <div class="user-info-row">
+            <strong>Tên hiển thị:</strong>
+            <span id="userDisplayName">—</span>
+          </div>
+
+          <div class="user-info-row" id="userPhotoRow" style="display:none;">
+            <strong>Ảnh đại diện:</strong>
+            <img id="userPhoto" src="" width="60" height="60" style="border-radius:50%;">
+          </div>
+        </div>
+
+        <button class="qt-btn" id="logoutBtn">Đăng xuất</button>
+        <button class="qt-btn qt-btn-secondary" id="updateProfileBtn">✏️ Cập nhật hồ sơ</button>
+        <button class="qt-btn qt-btn-secondary" id="showChangePasswordBtn">🔐 Đổi mật khẩu</button>
+        <button class="qt-btn qt-btn-secondary" id="verifyEmailBtn">Gửi email xác thực</button>
+        <button class="qt-btn qt-btn-danger" id="deleteAccountBtn">🗑️ Xóa tài khoản</button>
+      </div>
+
+      <!-- Change Password Section -->
+      <div class="change-password-section is-hidden" id="changePasswordSection">
+        <h4>🔐 Đổi mật khẩu</h4>
+        <div class="qt-row">
+          <label>Mật khẩu mới</label>
+          <input type="password" id="newPassword" placeholder="Tối thiểu 6 ký tự" required minlength="6" autocomplete="new-password">
+        </div>
+        <div class="qt-row">
+          <label>Xác nhận mật khẩu</label>
+          <input type="password" id="confirmNewPassword" placeholder="Nhập lại mật khẩu mới" required autocomplete="new-password">
+        </div>
+        <button class="qt-btn qt-btn-secondary" id="changePasswordBtn">Đổi mật khẩu</button>
+        <button class="qt-btn" id="cancelChangePasswordBtn">Hủy</button>
+      </div>
+
+      <!-- Update Profile Section -->
+      <div class="change-password-section is-hidden" id="updateProfileSection">
+        <h4>✏️ Cập nhật hồ sơ</h4>
+
+        <div class="qt-row">
+          <label>Tên hiển thị</label>
+          <input type="text" id="profileDisplayName" placeholder="Nhập tên hiển thị mới" maxlength="50">
+        </div>
+
+        <div class="qt-row">
+          <label>🔗 URL ảnh đại diện</label>
+          <input type="url" id="profilePhotoURL" placeholder="https://i.postimg.cc/xxxxxxxx/image.jpg">
+          <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+            💡 Tải ảnh lên <a href="https://postimages.org/" target="_blank" style="color: #667eea;">Postimages</a> 
+            rồi copy <strong>Direct link</strong> vào đây
+          </small>
+        </div>
+
+        <button class="qt-btn qt-btn-secondary" id="saveProfileBtn">💾 Lưu thay đổi</button>
+        <button class="qt-btn" id="cancelProfileBtn">Hủy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Translate Modal Overlay + Popup -->
+  <div id="qtOverlay" class="qt-overlay is-hidden"></div>
+  <div id="qtPopup" class="qt-popup is-hidden" aria-modal="true" role="dialog">
+    <div class="qt-header">
+      <div class="qt-title" id="qtTitle">🌐 Dịch nhanh</div>
+      <button class="qt-close" id="qtCloseBtn" aria-label="Đóng">✕</button>
+    </div>
+
+    <!-- Thanh chọn ngôn ngữ -->
+    <div class="qt-langbar">
+      <label class="qt-lang">
+        <!-- Ngôn ngữ nguồn: mặc định Tiếng Việt -->
+        <select id="qtSrc" aria-label="Ngôn ngữ nguồn">
+          <option value="en">English</option>
+          <option value="vi" selected>Tiếng Việt</option>
+        </select>
+      </label>
+
+      <span class="qt-swap" title="Đổi chiều" id="qtSwap">⇄</span>
+
+      <label class="qt-lang">
+        <!-- Ngôn ngữ đích: mặc định English -->
+        <select id="qtDest" aria-label="Ngôn ngữ đích">
+          <option value="vi">Tiếng Việt</option>
+          <option value="en" selected>English</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="qt-panels">
+      <div class="qt-panel qt-left">
+        <textarea
+          id="qtInput"
+          class="qt-textarea"
+          rows="4"
+          maxlength="500"
+          placeholder="Nhập văn bản cần dịch…"></textarea>
+        <div class="qt-bottom">
+          <div class="qt-counter" id="qtCounter">0 / 500</div>
+          <button id="qtTranslateBtn" class="qt-primary" disabled>Dịch</button>
+        </div>
+        <div class="qt-error" id="qtError" role="alert" hidden>
+          Có lỗi khi dịch. Vui lòng thử lại.
+        </div>
+      </div>
+
+      <div class="qt-panel qt-right">
+        <div id="qtOutput" class="qt-output" aria-live="polite"></div>
+        <div class="qt-actions">
+          <button id="qtCopyBtn" class="qt-secondary" title="Copy">📋 Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Profile Modal -->
+  <div id="editProfileOverlay" class="qt-overlay is-hidden"></div>
+  <div id="editProfileModal" class="edit-profile-modal is-hidden" aria-modal="true" role="dialog">
+    <div class="edit-profile-header">
+      <h2>✏️ Chỉnh sửa hồ sơ</h2>
+      <button class="qt-close" id="editProfileCloseBtn" aria-label="Đóng">✕</button>
+    </div>
+
+    <div class="edit-profile-body">
+      <!-- Avatar Section -->
+      <div class="avatar-section">
+        <div class="avatar-preview-container">
+          <img id="avatarPreview" src="" alt="Avatar" class="avatar-preview">
+          <div class="avatar-overlay">
+            <label for="avatarUpload" class="avatar-upload-btn">
+              📷 Chọn ảnh
+            </label>
+          </div>
+        </div>
+        <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
+        <p class="avatar-hint">Hoặc nhập URL ảnh bên dưới</p>
+      </div>
+
+      <!-- Form Fields -->
+      <div class="profile-form">
+        <div class="form-group">
+          <label for="editDisplayName">👤 Tên hiển thị</label>
+          <input type="text" id="editDisplayName" placeholder="Nhập tên của bạn" maxlength="50">
+          <span class="char-counter" id="nameCounter">0/50</span>
+        </div>
+
+        <div class="form-group">
+          <label for="editPhotoUrl">🔗 URL ảnh đại diện</label>
+          <input type="url" id="editPhotoUrl" placeholder="https://example.com/avatar.jpg">
+        </div>
+      </div>
+    </div>
+
+    <div class="edit-profile-footer">
+      <button class="btn-cancel" id="editProfileCancelBtn">Hủy</button>
+      <button class="btn-save" id="editProfileSaveBtn">💾 Lưu thay đổi</button>
+    </div>
+  </div>
+
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- Leaflet Routing Machine JS -->
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+  <script type="module" src="auth.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
